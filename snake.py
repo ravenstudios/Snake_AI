@@ -53,7 +53,7 @@ class Snake():
 
 
     def move_up(self):
-        print("")
+        print("up")
         self.dir = (0, -1)
 
     def move_right(self):
@@ -76,4 +76,4 @@ class Snake():
 
 
     def get_coords(self):
-        return (self.rect.x ,self.rect.y)
+        return (self.rect.x ,self.rect.y, self.dir)

@@ -16,7 +16,9 @@ class Apple():
 
     def update(self, snake):
         coord = (self.rect.x, self.rect.y)
-        if snake.get_coords() == coord:
+        sn = snake.get_coords()
+        snake_coords = (sn[0], sn[1])
+        if snake_coords == coord:
             snake.update_score()
             self.get_new_location()
 
