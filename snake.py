@@ -15,20 +15,47 @@ class Snake():
         dir_x = self.dir[0] * BLOCK_SIZE
         dir_y = self.dir[1] * BLOCK_SIZE
         self.rect = self.rect.move(dir_x, dir_y)
-        self.check_bounds()
+
 
 
     def check_bounds(self):
         if self.rect.x < 0 or self.rect.right > GAME_WIDTH or self.rect.y < 0 or self.rect.bottom > GAME_HEIGHT:
-            self.restart()
+            return True
+        return False
+
+    def check_apple(self, apple):
+        if self.rect == apple.rect:
+            return True
+        return False
+
+    def ai_move(self, dir):
+        if dir == 0:
+            # 0:Left
+            self.dir = (-1, 0)
+        elif dir == 1:
+            # 1:UP
+            self.dir = (0, -1)
+        elif dir == 2:
+            # 2:Right
+            self.dir = (1, 0)
+        elif dir == 3:
+            # 3:Down
+            self.dir = (0, 1)
 
 
-    def restart(self):
+
+
+
+
+        self.dir == dir
+
+
+    def reset(self):
         self.rect.x = GAME_WIDTH // 2
         self.rect.y = GAME_HEIGHT // 2
         self.score = 0
         self.dir = (1, 0)
-        pg.time.delay(1000)
+        # pg.time.delay(300)
 
 
 
@@ -76,4 +103,4 @@ class Snake():
 
 
     def get_coords(self):
-        return (self.rect.x ,self.rect.y, self.dir)
+        return (self.rect.x ,self.rect.y, self.dir[0], self.dir[1])

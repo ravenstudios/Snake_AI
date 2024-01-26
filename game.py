@@ -19,11 +19,11 @@ class Game():
         self.prev_time = pygame.time.get_ticks()
 
 
+    def set_caption(self, cap):
+        pygame.display.set_caption(cap)
 
-    def run(self):
 
-
-
+    def step(self, move):
         self.clock.tick(TICK_RATE)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -35,15 +35,27 @@ class Game():
                     pygame.quit()
 
 
-        delta = pygame.time.get_ticks() - self.prev_time
-        if delta > self.game_speed * 1000:
-            self.prev_time = pygame.time.get_ticks()
-            self.draw()
-            self.update()
+
+        self.snake.ai_move(move)
+        self.snake.update()
+        self.apple.update(self.snake)
+        self.draw()
+
+        reward = int(self.snake.check_apple(self.apple))
+
+        done = int(self.snake.check_bounds())
+        if done:
+            reward = -1
+
+
+        return self.get_state(), reward, done
 
 
 
 
+    def reset(self):
+        self.snake.reset()
+        return self.get_state()
 
     def draw(self):
         self.surface.fill((0, 0, 0))#background
@@ -62,7 +74,10 @@ class Game():
     def get_state(self):
         sn = self.snake.get_coords()
         apl = self.apple.get_coords()
-        return [sn[0], sn[1], sn[2][0], sn[2][1], apl[0], apl[1]]
+        return [sn[0], sn[1], sn[2], sn[3], apl[0], apl[1]]
+
+
+
 
     def ai_move(self, move):
         if move == 0:

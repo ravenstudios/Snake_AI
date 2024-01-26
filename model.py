@@ -11,5 +11,5 @@ def make_model(input_shape, hidden_size, output_size):
         keras.layers.Dense(output_size)
     ])
 
-    model.build(input_shape=(None, 6))
+    model.build(input_shape=(None, input_shape))
     return model

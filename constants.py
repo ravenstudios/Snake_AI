@@ -1,4 +1,4 @@
-TICK_RATE = 60
+TICK_RATE = 120
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)

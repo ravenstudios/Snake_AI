@@ -1,110 +1,106 @@
-import random
-from collections import deque
-import game
-from model import make_model
 import numpy as np
-import tensorflow as tf
-from tensorflow import keras
+import pygame
+import sys
+from tensorflow.keras.models import load_model
+import game
+import model
+import random
+# Initialize Pygame
+pygame.init()
 
-MAX_MEMORY = 100_000
-BATCH_SIZE = 1000
-LR = 0.001
+# Set up game constants
+width, height = 600, 400
+snake_size = 20
+fps = 10
 
-class Agent:
-
-    def __init__(self):
-        self.game = game.Game()
-        self.n_games = 0
-        self.epsilon = 1
-        self.epsilon_min = 0.0001
-        self.epsilon_decay = 0.998
-
-        self.gamma = 0.95
-        self.memory = deque(maxlen=MAX_MEMORY)
-        self.model = make_model(
-            input_shape=[6], hidden_size=128, output_size=4)
-        self.loss_fn = keras.losses.mean_squared_error
-        self.optimizer = keras.optimizers.Adam(learning_rate=LR)
+# Set up colors
+black = (0, 0, 0)
+white = (255, 255, 255)
+history = ""
+# Load the trained Q-network
+# model = model.make_model((4,), 1, 3)
 
 
+optimizer = "adam"
+# Load the trained Q-network
+q_network = model.make_model((6,), 1, 4)
+q_network.compile(optimizer=optimizer, loss="mse")
+# Initialize other parameters
+gamma = 0.9  # Discount factor for future rewards
+  # You can adjust the optimizer and learning rate as needed
+learning_rate = 0.001
+batch_size = 32
+replay_memory = []  # Buffer to store experiences for online training
+
+env = game.Game()
+
+# Function to add an experience to replay memory
+def add_experience(state, action, reward, next_state, done):
+
+    replay_memory.append([state, action, reward, next_state, done])
 
 
-    def _epsilon_greedy_policy(self, state):
-        if self.epsilon > self.epsilon_min:
-            self.epsilon = self.epsilon * self.epsilon_decay
-        else:
-            self.epsilon = self.epsilon_min
+    # print(f"mem:{replay_memory}")
+    # Ensure replay memory does not exceed specified capacity
+    if len(replay_memory) > 10000:
+        replay_memory.pop(0)
+# Online training function
+def train_model():
+    global history
+    if len(replay_memory) < batch_size:
+        return  # Not enough experiences for training yet
 
-        new_action = 0
-
-        if np.random.rand() < self.epsilon:
-            action_choice = np.random.randint(0, 3)
-            new_action =action_choice
-        else:
-            Q_values = self.model.predict(state[np.newaxis])
-            action_choice = np.argmax(Q_values[0])
-            new_action = action_choice
-
-        return new_action
-
-    def sample_experiences(self, batch_size):
-        indices = np.random.randint(len(self.memory), size=batch_size)
-        batch = [self.memory[index] for index in indices]
-        states, actions, rewards, next_states, dones = [
-            np.array([experience[field_index] for experience in batch])
-            for field_index in range(5)
-        ]
-        return states, actions, rewards, next_states, dones
-
-    def play_one_step(self, env, state):
-        action = self._epsilon_greedy_policy(state)
-        next_state, reward, done, info = env.run()
-        self.memory.append((state, action, reward, next_state, done))
-        return next_state, action, reward, done, info
-
-    def training_step(self, batch_size):
-        experiences = self.sample_experiences(batch_size)
-        states, actions, rewards, next_states, dones = experiences
-        target_Q_values = (rewards + self.gamma *
-                           np.max(self.model.predict(next_states)))
-
-        next_Q_values = self.model.predict(next_states)
-        max_next_Q_values = np.max(next_Q_values, axis=1)
-        target_Q_values = (rewards + self.gamma * max_next_Q_values)
-
-        with tf.GradientTape() as tape:
-            all_Q_values = self.model(states)
-            Q_values = tf.reduce_sum(
-                all_Q_values * actions, axis=1, keepdims=True)
-            loss = tf.reduce_mean(self.loss_fn(target_Q_values, Q_values))
-        grads = tape.gradient(loss, self.model.trainable_variables)
-        self.optimizer.apply_gradients(
-            zip(grads, self.model.trainable_variables))
-
-    def train(self):
-        while True:
-            state = self.get_state()
-            self.game.run()
-            self.game.ai_move(random.randint(0, 3))
-
-if __name__ == '__main__':
-    agent = Agent()
-    # a.train()
+    batch_indices = np.random.choice(len(replay_memory), batch_size, replace=False)
+    batch = [replay_memory[i] for i in batch_indices]
 
 
 
-    state = agent.game.get_state()
-    env = agent.game
+    states, actions, rewards, next_states, dones = zip(*batch)
 
-    while True:
-        next_state, action, reward, done, info = agent.play_one_step(
-            env, state)
+    # Convert the arrays to NumPy arrays
+    states = np.vstack(states)
+    actions = np.array(actions)
+    rewards = np.array(rewards)
+    next_states = np.vstack(next_states)
+    dones = np.array(dones)
 
-        state = next_state
+    # Calculate target Q-values using the Bellman equation
+    target_values = rewards + gamma * np.amax(q_network.predict(next_states), axis=1) * (1 - dones)
 
-        if done:
-            agent.n_games += 1
+    # Get the current Q-values for the chosen actions
+    current_values = q_network.predict(states)
+    chosen_action_values = current_values[np.arange(batch_size), actions]
+
+    # Update the Q-values using the temporal difference error
+    current_values[np.arange(batch_size), actions] = target_values
+
+    # Train the model on the updated Q-values
+    q_network.train_on_batch(states, current_values)
+    history = q_network.fit(states, current_values, verbose=0)
+
+    # Print the training metrics
+    # print("Training Metrics:", history.history)
+# Test the trained Q-network
+state = env.reset()
 
 
-        if len(agent.memory) > BATCH_SIZE:
-            agent.training_step(BATCH_SIZE)
+
+env = game.Game()
+
+# Test the trained Q-network
+state = env.get_state()
+tries = 0
+while True:
+    action = np.argmax(q_network.predict(np.expand_dims(state, axis=0))[0])
+    next_state, reward, done = env.step(action)
+    add_experience(state, action, reward, next_state, done)
+    train_model()  #
+    state = next_state
+    if history:
+        env.set_caption(f"Tries:{tries}  Loss:{history.history}")
+
+    env.draw()
+    if done == 1:
+        tries += 1
+
+        env.reset()
